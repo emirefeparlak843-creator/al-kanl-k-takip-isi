@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Alışkanlık Takipçisi</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;800&display=swap">
+<style>
+:root{--bg:#eef2f7;--surface:#fff;--ink:#14213d;--mute:#6b7a93;--line:#d5dce8;--acc:#2f5bff;--on-acc:#fff;--empty:#e3e9f3;
+color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1626;--surface:#18233b;--ink:#e8eefc;--mute:#8fa0bf;--line:#2a3857;--acc:#6f8dff;--on-acc:#0f1626;--empty:#243253;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0f1626;--surface:#18233b;--ink:#e8eefc;--mute:#8fa0bf;--line:#2a3857;--acc:#6f8dff;--on-acc:#0f1626;--empty:#243253;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:"Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.4}
+main{max-width:520px;margin:0 auto;padding:24px 16px 48px}
+h1{font-size:2rem;font-weight:800;letter-spacing:-.02em;margin:0}
+.date{color:var(--mute);margin:2px 0 18px}
+.sum{display:flex;align-items:baseline;gap:10px;margin-bottom:6px}
+.sum b{font-size:3.2rem;font-weight:800;line-height:1;letter-spacing:-.04em}
+.sum span{color:var(--mute)}
+.bar{height:8px;border-radius:4px;background:var(--empty);overflow:hidden;margin-bottom:24px}
+.bar i{display:block;height:100%;background:var(--acc);width:0;transition:width .3s}
+.habit{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.name{font-weight:600;font-size:1.1rem;overflow-wrap:anywhere}
+.streak{color:var(--mute);font-size:.9rem}
+.streak b{color:var(--ink)}
+.del{background:none;border:0;color:var(--mute);font:inherit;font-size:.85rem;cursor:pointer;padding:4px}
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:12px}
+.day{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:.75rem;color:var(--mute);background:none;border:0;font-family:inherit;cursor:pointer;padding:0}
+.dot{width:100%;max-width:44px;aspect-ratio:1;border-radius:50%;background:var(--empty);display:grid;place-items:center;color:var(--on-acc);font-weight:800;transition:background .15s}
+.day.on .dot{background:var(--acc)}
+.day.today{color:var(--ink);font-weight:600}
+.day.today .dot{outline:2px solid var(--acc);outline-offset:2px}
+.add{display:flex;gap:8px;margin-top:20px}
+input{flex:1;min-width:0;font:inherit;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+.add button{font:inherit;font-weight:600;border:0;border-radius:12px;padding:0 18px;background:var(--acc);color:var(--on-acc);cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.empty{color:var(--mute);text-align:center;padding:28px 0}
+.acts{display:flex;gap:2px;flex-shrink:0}
+.cal{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+.ch{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;text-transform:capitalize}
+.cg{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:10px}
+.wh{text-align:center;font-size:.75rem;color:var(--mute)}
+.cd{aspect-ratio:1;border:0;border-radius:50%;background:var(--empty);color:var(--ink);font:inherit;font-size:.85rem;cursor:pointer;padding:0}
+.cd.on{background:var(--acc);color:var(--on-acc);font-weight:600}
+.cd.today{outline:2px solid var(--acc);outline-offset:1px}
+.cd:disabled{opacity:.35;cursor:default}
+.del:disabled{opacity:.3;cursor:default}
+</style>
+</head>
+<body>
+<main>
+  <h1>Alışkanlıklar</h1>
+  <p class="date" id="date"></p>
+  <div class="sum"><b id="n">0/0</b><span>bugün tamamlandı</span></div>
+  <div class="bar"><i id="bar"></i></div>
+  <div id="list"></div>
+  <div class="add">
+    <input id="inp" placeholder="Yeni alışkanlık ekle" maxlength="60" autocomplete="off">
+    <button id="addBtn">Ekle</button>
+  </div>
+</main>
+<script>
+var KEY='habits-v1',habits=[],openId=null,mo=0;
+var DN=['Pz','Pt','Sa','Ça','Pe','Cu','Ct'];
+try{habits=JSON.parse(localStorage.getItem(KEY)||'[]')}catch(e){habits=[]}
+if(!habits.length){habits=[{id:1,name:'Su iç (2 litre)',days:{}},{id:2,name:'20 dakika yürü',days:{}}]}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(habits))}catch(e){}}
+function key(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function shift(d,n){var x=new Date(d);x.setDate(x.getDate()+n);return x}
+function streak(h){var d=new Date(),c=0;if(!h.days[key(d)])d=shift(d,-1);while(h.days[key(d)]){c++;d=shift(d,-1)}return c}
+function esc(s){return s.replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function best(h){var ks=Object.keys(h.days).sort(),b=0,c=0,p=null;ks.forEach(function(k){c=(p&&key(shift(p,1))===k)?c+1:1;if(c>b)b=c;p=new Date(k+'T00:00:00')});return b}
+function calHtml(h){
+  var t=new Date(),f=new Date(t.getFullYear(),t.getMonth()+mo,1),n=new Date(f.getFullYear(),f.getMonth()+1,0).getDate(),off=(f.getDay()+6)%7,tk=key(t),c=0,out='';
+  for(var i=0;i<off;i++)out+='<span></span>';
+  for(var d=1;d<=n;d++){var k=key(new Date(f.getFullYear(),f.getMonth(),d)),on=h.days[k];if(on)c++;
+    out+='<button class="cd'+(on?' on':'')+(k===tk?' today':'')+'" data-id="'+h.id+'" data-k="'+k+'"'+(k>tk?' disabled':'')+'>'+d+'</button>'}
+  var hd=['Pt','Sa','Ça','Pe','Cu','Ct','Pz'].map(function(x){return '<span class="wh">'+x+'</span>'}).join('');
+  return '<div class="cal"><div class="ch"><button class="del" data-mo="-1" aria-label="Önceki ay">‹</button><b>'+f.toLocaleDateString('tr-TR',{month:'long',year:'numeric'})+'</b><button class="del" data-mo="1" aria-label="Sonraki ay"'+(mo>=0?' disabled':'')+'>›</button></div><div class="cg">'+hd+out+'</div><div class="streak">Bu ay <b>'+c+'</b> gün, en uzun seri <b>'+best(h)+'</b> gün</div></div>';
+}
+function render(){
+  var today=new Date(),tk=key(today),html='',done=0;
+  document.getElementById('date').textContent=today.toLocaleDateString('tr-TR',{weekday:'long',day:'numeric',month:'long'});
+  habits.forEach(function(h){
+    if(h.days[tk])done++;
+    var cells='';
+    for(var i=6;i>=0;i--){
+      var d=shift(today,-i),k=key(d),on=h.days[k];
+      cells+='<button class="day'+(on?' on':'')+(i===0?' today':'')+'" data-id="'+h.id+'" data-k="'+k+'" aria-pressed="'+(!!on)+'" aria-label="'+esc(h.name)+' '+k+'"><span class="dot">'+(on?'✓':'')+'</span>'+DN[d.getDay()]+'</button>';
+    }
+    var s=streak(h);
+    html+='<div class="habit"><div class="top"><div><div class="name">'+esc(h.name)+'</div><div class="streak"><b>'+s+'</b> günlük seri</div></div><div class="acts"><button class="del" data-cal="'+h.id+'">'+(openId==h.id?'Kapat':'Takvim')+'</button><button class="del" data-del="'+h.id+'">Sil</button></div></div><div class="week">'+cells+'</div>'+(openId==h.id?calHtml(h):'')+'</div>';
+  });
+  document.getElementById('list').innerHTML=html||'<div class="empty">Henüz alışkanlık yok. Aşağıdan ilkini ekle.</div>';
+  document.getElementById('n').textContent=done+'/'+habits.length;
+  document.getElementById('bar').style.width=(habits.length?done/habits.length*100:0)+'%';
+}
+document.getElementById('list').addEventListener('click',function(e){
+  var b=e.target.closest('button');if(!b)return;
+  if(b.dataset.cal){openId=(openId==b.dataset.cal)?null:b.dataset.cal;mo=0}
+  else if(b.dataset.mo){mo+=+b.dataset.mo}
+  else if(b.dataset.del){habits=habits.filter(function(h){return h.id!=b.dataset.del})}
+  else if(b.dataset.k){var h=habits.filter(function(x){return x.id==b.dataset.id})[0];if(h.days[b.dataset.k])delete h.days[b.dataset.k];else h.days[b.dataset.k]=1}
+  save();render();
+});
+function add(){var i=document.getElementById('inp'),v=i.value.trim();if(!v)return;habits.push({id:Date.now(),name:v,days:{}});i.value='';save();render()}
+document.getElementById('addBtn').addEventListener('click',add);
+document.getElementById('inp').addEventListener('keydown',function(e){if(e.key==='Enter')add()});
+render();
+</script>
+</body>
+</html>
